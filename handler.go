@@ -19,8 +19,14 @@ type Entry struct {
 // If the path is not provided in the map, then the fallback
 // http.Handler will be called instead.
 func MapHandler(pathsToUrls map[string]string, fallback http.Handler) http.HandlerFunc {
-	//	TODO: Implement this...
-	return nil
+	mux := http.NewServeMux()
+	for k, v := range pathsToUrls {
+		if k == "" {
+			mux.Handle(k, fallback)
+		}
+		mux.Handle(k, http.RedirectHandler(v, http.StatusFound))
+	}
+	return mux.ServeHTTP
 }
 
 // YAMLHandler will parse the provided YAML and then return
@@ -40,8 +46,12 @@ func MapHandler(pathsToUrls map[string]string, fallback http.Handler) http.Handl
 // See MapHandler to create a similar http.HandlerFunc via
 // a mapping of paths to urls.
 func YAMLHandler(yml []byte, fallback http.Handler) (http.HandlerFunc, error) {
-	// TODO: Implement this...
-	return nil, nil
+	parsedYaml, err := parseYAML(yml)
+	if err != nil {
+		return nil, err
+	}
+	pathMap := buildMap(parsedYaml)
+	return MapHandler(pathMap, fallback), nil
 }
 
 func parseYAML(yml []byte) ([]Entry, error) {
@@ -52,4 +62,12 @@ func parseYAML(yml []byte) ([]Entry, error) {
 		return nil, err
 	}
 	return entries, nil
+}
+
+func buildMap(entries []Entry) map[string]string {
+	pathMap := make(map[string]string)
+	for _, entry := range entries {
+		pathMap[entry.Path] = entry.URL
+	}
+	return pathMap
 }
