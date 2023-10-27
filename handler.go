@@ -1,8 +1,16 @@
 package urlshort
 
 import (
+	"bytes"
 	"net/http"
+
+	"gopkg.in/yaml.v3"
 )
+
+type Entry struct {
+	Path string
+	URL  string
+}
 
 // MapHandler will return an http.HandlerFunc (which also
 // implements http.Handler) that will attempt to map any
@@ -34,4 +42,14 @@ func MapHandler(pathsToUrls map[string]string, fallback http.Handler) http.Handl
 func YAMLHandler(yml []byte, fallback http.Handler) (http.HandlerFunc, error) {
 	// TODO: Implement this...
 	return nil, nil
+}
+
+func parseYAML(yml []byte) ([]Entry, error) {
+	var entries []Entry
+	decoder := yaml.NewDecoder(bytes.NewReader(yml))
+	err := decoder.Decode(&entries)
+	if err != nil {
+		return nil, err
+	}
+	return entries, nil
 }
