@@ -1,7 +1,6 @@
 package urlshort
 
 import (
-	"bytes"
 	"net/http"
 
 	"gopkg.in/yaml.v3"
@@ -56,8 +55,7 @@ func YAMLHandler(yml []byte, fallback http.Handler) (http.HandlerFunc, error) {
 
 func parseYAML(yml []byte) ([]Entry, error) {
 	var entries []Entry
-	decoder := yaml.NewDecoder(bytes.NewReader(yml))
-	err := decoder.Decode(&entries)
+	err := yaml.Unmarshal(yml, &entries)
 	if err != nil {
 		return nil, err
 	}
