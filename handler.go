@@ -1,6 +1,7 @@
 package urlshort
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"gopkg.in/yaml.v3"
@@ -18,14 +19,14 @@ type Entry struct {
 // If the path is not provided in the map, then the fallback
 // http.Handler will be called instead.
 func MapHandler(pathsToUrls map[string]string, fallback http.Handler) http.HandlerFunc {
-	mux := http.NewServeMux()
-	for k, v := range pathsToUrls {
-		if k == "" {
-			mux.Handle(k, fallback)
+	return func(w http.ResponseWriter, r *http.Request) {
+		url := pathsToUrls[r.URL.Path]
+		if url != "" {
+			http.Redirect(w, r, url, http.StatusPermanentRedirect)
+		} else {
+			fallback.ServeHTTP(w, r)
 		}
-		mux.Handle(k, http.RedirectHandler(v, http.StatusFound))
 	}
-	return mux.ServeHTTP
 }
 
 // YAMLHandler will parse the provided YAML and then return
@@ -53,9 +54,27 @@ func YAMLHandler(yml []byte, fallback http.Handler) (http.HandlerFunc, error) {
 	return MapHandler(pathMap, fallback), nil
 }
 
+func JSONHandler(json []byte, fallback http.Handler) (http.HandlerFunc, error) {
+	parsedJson, err := parseJSON(json)
+	if err != nil {
+		return nil, err
+	}
+	pathMap := buildMap(parsedJson)
+	return MapHandler(pathMap, fallback), nil
+}
+
 func parseYAML(yml []byte) ([]Entry, error) {
 	var entries []Entry
 	err := yaml.Unmarshal(yml, &entries)
+	if err != nil {
+		return nil, err
+	}
+	return entries, nil
+}
+
+func parseJSON(js []byte) ([]Entry, error) {
+	var entries []Entry
+	err := json.Unmarshal(js, &entries)
 	if err != nil {
 		return nil, err
 	}

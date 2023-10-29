@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"urlshort"
 )
 
@@ -22,24 +23,25 @@ func main() {
 	}
 	mapHandler := urlshort.MapHandler(pathsToUrls, mux)
 
-	// Build the YAMLHandler using the mapHandler as the fallback
-	file, err := os.Open(*filename)
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
+	content, ext := openFile(*filename)
+	var handler http.Handler
+	var err error
 
-	yaml, err := io.ReadAll(file)
-	if err != nil {
-		panic(err)
+	switch ext {
+	case ".yml":
+		handler, err = urlshort.YAMLHandler(content, mapHandler)
+		if err != nil {
+			panic(err)
+		}
+	case ".json":
+		handler, err = urlshort.JSONHandler(content, mapHandler)
+		if err != nil {
+			panic(err)
+		}
 	}
 
-	yamlHandler, err := urlshort.YAMLHandler([]byte(yaml), mapHandler)
-	if err != nil {
-		panic(err)
-	}
 	fmt.Println("Starting the server on :8080")
-	http.ListenAndServe(":8080", yamlHandler)
+	http.ListenAndServe(":8080", handler)
 }
 
 func defaultMux() *http.ServeMux {
@@ -50,4 +52,18 @@ func defaultMux() *http.ServeMux {
 
 func hello(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "Hello, world!")
+}
+
+func openFile(name string) ([]byte, string) {
+	file, err := os.Open(name)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	content, err := io.ReadAll(file)
+	if err != nil {
+		panic(err)
+	}
+	return content, filepath.Ext(name)
 }
