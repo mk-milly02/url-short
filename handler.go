@@ -1,6 +1,7 @@
 package urlshort
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 
@@ -61,6 +62,28 @@ func JSONHandler(json []byte, fallback http.Handler) (http.HandlerFunc, error) {
 	}
 	pathMap := buildMap(parsedJson)
 	return MapHandler(pathMap, fallback), nil
+}
+
+func DBHandler(rows *sql.Rows, fallback http.Handler) (http.HandlerFunc, error) {
+	parsedJson, err := parseROWS(rows)
+	if err != nil {
+		return nil, err
+	}
+	pathMap := buildMap(parsedJson)
+	return MapHandler(pathMap, fallback), nil
+}
+
+func parseROWS(rows *sql.Rows) ([]Entry, error) {
+	var entries []Entry
+	for rows.Next() {
+		var entry Entry
+		err := rows.Scan(&entry.Path, &entry.URL)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+	return entries, nil
 }
 
 func parseYAML(yml []byte) ([]Entry, error) {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
 	"fmt"
 	"io"
@@ -8,9 +9,20 @@ import (
 	"os"
 	"path/filepath"
 	"urlshort"
+
+	_ "github.com/lib/pq"
+)
+
+const (
+	host     = "localhost"
+	port     = 5432
+	user     = "postgres"
+	password = "password"
+	dbname   = "urlstore"
 )
 
 func main() {
+	useDb := flag.Bool("database", false, "a database that serves as a URL store")
 	filename := flag.String("file", "../paths.yml", "a yaml file that serves as a URL store")
 	flag.Parse()
 
@@ -23,20 +35,29 @@ func main() {
 	}
 	mapHandler := urlshort.MapHandler(pathsToUrls, mux)
 
-	content, ext := openFile(*filename)
 	var handler http.Handler
 	var err error
 
-	switch ext {
-	case ".yml":
-		handler, err = urlshort.YAMLHandler(content, mapHandler)
+	if *useDb {
+		content := getURLsFromDB()
+		handler, err = urlshort.DBHandler(content, mapHandler)
 		if err != nil {
 			panic(err)
 		}
-	case ".json":
-		handler, err = urlshort.JSONHandler(content, mapHandler)
-		if err != nil {
-			panic(err)
+	} else {
+		content, ext := openFile(*filename)
+
+		switch ext {
+		case ".yml":
+			handler, err = urlshort.YAMLHandler(content, mapHandler)
+			if err != nil {
+				panic(err)
+			}
+		case ".json":
+			handler, err = urlshort.JSONHandler(content, mapHandler)
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 
@@ -66,4 +87,25 @@ func openFile(name string) ([]byte, string) {
 		panic(err)
 	}
 	return content, filepath.Ext(name)
+}
+
+func getURLsFromDB() *sql.Rows {
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
+	db, err := sql.Open("postgres", psqlInfo)
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Successfully connected!")
+
+	rows, err := db.Query("SELECT * FROM urlstore")
+	if err != nil {
+		panic(err)
+	}
+	return rows
 }
